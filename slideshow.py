@@ -8,8 +8,10 @@ import argparse
 import os
 import sys
 import tkinter as tk
+import subprocess
 
 
+title_height = 70
 margin_x = 20
 margin_y = 20
 
@@ -33,13 +35,24 @@ def build_parser():
     return parser
 
 
+def run(cmd):
+    """
+    Run cmd as a subprocess. Returns stdout.
+    """
+    process = subprocess.run(cmd, text=True, capture_output=True)
+    if process.stderr:
+        print(f'Error: stderr={process.stderr}, stdout={process.stdout}')
+    return process.stdout
+
+
 class Application():
-    def __init__(self, root, canvas, img, png_header, xy):
+    def __init__(self, root, canvas, img, xy):
         """
         xy is an empty list object used to return with width and height.
         """
         self.root = root
-        self.png_header = png_header
+        self.width = img.width()
+        self.height = img.height()
         self.xy = xy
         canvas.create_image(margin_x, margin_y, anchor=tk.NW, image=img)      
         canvas.bind("<Button-1>", self.callback)
@@ -49,66 +62,37 @@ class Application():
         x = event.x - margin_x
         y = event.y - margin_y
         if (x >= 0 and y >= 0
-            and x < self.png_header['width']
-            and y < self.png_header['height']):
+            and x < self.width
+            and y < self.height):
             # Return the (x,y) position to the caller.
             self.xy.append(x)
             self.xy.append(y)
             self.root.destroy()
 
 
-def is_png_header(file):
-    bytes = file.read(8)
-    for (e_byte, byte) in zip([b'\x89', b'P', b'N', b'G', b'\r', b'\n', b'\x1a', b'\n'], bytes):
-        if ord(e_byte) != byte:
-            print('Got an unexpected byte reading the PNG header', ord(e_byte), byte)
-            return False
-        return True
-
-def b_to_int(bytes):
-    return ((bytes[0] * 256 + bytes[1]) * 256 + bytes[2]) * 256 + bytes[3]
-
-def read_chunk_header(bytes):
-    return (b_to_int(bytes[0:4]), bytes[4:])
-
-def read_header(file, length):
-    bytes = file.read(length)
-    width = b_to_int(bytes[:4])
-    height = b_to_int(bytes[4:8])
-    (bit_depth, color_type, compression_method, interlace_method, filter_method) = bytes[8:]
-    return (width, height, bit_depth, color_type, compression_method, interlace_method, filter_method)
-
-
-"""image's width (4 bytes), height (4 bytes), bit depth (1 byte), color type (1 byte), compression method (1 byte), filter method (1 byte), and interlace method (1 byte) """
-
-def get_png_header(filename):
-    """
-    Return a dict with the attributes of the PNG header chunk. It is the first chunk.
-    On failure, either an exception or an empty dict.
-    """
-    with open(filename, 'rb') as file:
-        if is_png_header(file):
-            (length, ck_type) = read_chunk_header(file.read(8))
-            if ck_type == ck_type_header:
-                (width, height, bit_depth, color_type, compression_method, interlace_method, filter_method) = read_header(file, length)
-                return dict(zip([
-                    'width', 'height', 'bit_depth', 'color_type', 'compression_method', 'interlace_method', 'filter_method'],[width, height, bit_depth, color_type, compression_method, interlace_method, filter_method]))
-    return dict()
-
-
 def main(args):
     os.chdir(args.image_dir)
     filename = args.image_filename
-    png_header = get_png_header(filename)
+    scaled_filename = f'scaled_{args.image_filename}'
 
-    root = tk.Tk()      
-    canvas = tk.Canvas(root, width = png_header['width'] + margin_x * 2,
-                       height = png_header['height'] + margin_y * 2)
+    (width, height) = eval(run(['magick', 'identify', '-format', '(%w,%h)', filename]))
+    root = tk.Tk()
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    scale = int(min((screen_width - margin_x * 2) / width,
+                    (screen_height - margin_y * 2 - title_height) / height) * 100)
+    run(['magick', filename, '-resize', f'{scale}%', scaled_filename])
+
+    # Get w/h of image using imagemagick 
+
+    canvas = tk.Canvas(root, width = screen_width,
+                       height = screen_height)
     canvas.pack()      
     # Putting the next line into __init__ causes the image to not appear.
-    img = tk.PhotoImage(file=filename)
+    img = tk.PhotoImage(file=scaled_filename)
+    print(img.width(), img.height())
     xy = []
-    application = Application(root, canvas, img, png_header, xy)
+    application = Application(root, canvas, img, xy)
     tk.mainloop()
     (x, y) = xy
     print(x, y)
