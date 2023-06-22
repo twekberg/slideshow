@@ -1,12 +1,13 @@
 #!/usr/bin/env python
-
 """
 Display a png file and report the mouse position on a mouse click.
 """
 
 import argparse
 import os
+import random
 import sys
+import time
 import tkinter as tk
 import subprocess
 
@@ -70,20 +71,27 @@ class Application():
             self.root.destroy()
 
 
-def main(args):
-    os.chdir(args.image_dir)
-    filename = args.image_filename
-    scaled_filename = f'scaled_{args.image_filename}'
+def parallel():
+    for i in range(10):
+        print('parallel')
+        time.sleep(4)
 
-    (width, height) = eval(run(['magick', 'identify', '-format', '(%w,%h)', filename]))
+
+def main(args):
     root = tk.Tk()
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
+    os.chdir(args.image_dir)
+    filenames = os.listdir('.')
+    filename = random.choice(filenames)
+    scaled_filename = f'scaled_{args.image_filename}'
+
+    # Get w/h of image using imagemagick 
+    (width, height) = eval(run(['magick', 'identify', '-format', '(%w,%h)', filename]))
     scale = int(min((screen_width - margin_x * 2) / width,
                     (screen_height - margin_y * 2 - title_height) / height) * 100)
     run(['magick', filename, '-resize', f'{scale}%', scaled_filename])
 
-    # Get w/h of image using imagemagick 
 
     canvas = tk.Canvas(root, width = screen_width,
                        height = screen_height)
@@ -93,9 +101,11 @@ def main(args):
     print(img.width(), img.height())
     xy = []
     application = Application(root, canvas, img, xy)
-    tk.mainloop()
-    (x, y) = xy
-    print(x, y)
+    root.after(0, parallel)
+    #root.mainloop()
+    root.update()
+    print(xy)
+    time.sleep(10)
 
 if __name__ == '__main__':
     sys.exit(main(build_parser().parse_args()))

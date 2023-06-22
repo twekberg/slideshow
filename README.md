@@ -9,5 +9,8 @@ The image is scaled to the screen width.
 Got rid of the image header parsing and instead use magick to determine the size.
 
 TODO:
-  randomize
   put in a loop
+    Looking to do multithreading with tkinter. The other
+	function would sleep after the image appears and exit mainloop.
+---- done ---------------------------------------------------------------------
+  randomize
