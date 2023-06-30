@@ -5,12 +5,13 @@ Display a png file and report the mouse position on a mouse click.
 
 import argparse
 import os
+from pathlib import Path
 import random
 import sys
 import time
 import tkinter as tk
 import subprocess
-
+from threading import Thread
 
 title_height = 70
 margin_x = 20
@@ -25,13 +26,9 @@ def build_parser():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-i', '--image_filename',
-                        default='00dca0b6f6774b846851d5e32eb747aa.png',
-                        help='Filename for image. Default: %(default)s')
-
     parser.add_argument('-d', '--image_dir',
                         default='F:/N/O/SPELLSNO/IMAGES/BIG/00OK',
-                        help='Directory for image_filename. Default: %(default)s')
+                        help='Directory for images. Default: %(default)s')
 
     return parser
 
@@ -71,22 +68,31 @@ class Application():
             self.root.destroy()
 
 
-def parallel():
+def parallel(root):
+    print('parallel')
     for i in range(10):
-        print('parallel')
-        time.sleep(4)
+        print('sleep', i)
+        time.sleep(1)
+    try:
+        # Doesn't like to do this outside of the main loop.
+        root.destroy()
+    except RuntimeError:
+        pass
+    #sys.exit()
 
 
 def main(args):
     root = tk.Tk()
+    thread = Thread(target=parallel, args=(root,))
+    thread.start()
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     os.chdir(args.image_dir)
     filenames = os.listdir('.')
     filename = random.choice(filenames)
-    scaled_filename = f'scaled_{args.image_filename}'
+    scaled_filename = Path(f'scaled_{filename}').stem + '.png'
 
-    # Get w/h of image using imagemagick 
+    # Get w/h of image using imagemahelp(rootgick 
     (width, height) = eval(run(['magick', 'identify', '-format', '(%w,%h)', filename]))
     scale = int(min((screen_width - margin_x * 2) / width,
                     (screen_height - margin_y * 2 - title_height) / height) * 100)
@@ -101,11 +107,11 @@ def main(args):
     print(img.width(), img.height())
     xy = []
     application = Application(root, canvas, img, xy)
-    root.after(0, parallel)
-    #root.mainloop()
-    root.update()
+    root.mainloop()
     print(xy)
-    time.sleep(10)
+    sys.exit()
+    print('all done')
+
 
 if __name__ == '__main__':
     sys.exit(main(build_parser().parse_args()))
